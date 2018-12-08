@@ -447,17 +447,24 @@ class Spaceship(VectorSprite):
                                move=v+self.move, max_age=10,
                                kill_on_edge=True, color=self.color,
                                bossnumber=self.number)
+        # --- mzzleflash 25, 0  vor raumschiff
+        p = pygame.math.Vector2(32,0)
+        p.rotate_ip(self.angle)
+        Muzzle_flash(pos=pygame.math.Vector2(self.pos.x, self.pos.y) + p, max_age=0.1, angle = self.angle)
+        
+        
+        
     
     def update(self, seconds):
         VectorSprite.update(self, seconds)
-        if random.random() < 0.8:
-            for x,y  in [(-30,-8), (-30,8)]:
-                 v = pygame.math.Vector2(x,y)
-                 v.rotate_ip(self.angle)
-                 c = randomize_color(160, 25)
-                 Smoke(max_age=2.5, pos=v+pygame.math.Vector2(
-                       self.pos.x, self.pos.y), color=(c,c,c))
-            
+        #if random.random() < 0.8:
+        #    for x,y  in [(-30,-8), (-30,8)]:
+        #         v = pygame.math.Vector2(x,y)
+        #         v.rotate_ip(self.angle)
+                 #c = randomize_color(160, 25)
+                 #Smoke(max_age=2.5, pos=v+pygame.math.Vector2(
+                 #      self.pos.x, self.pos.y), color=(c,c,c))
+        
     def strafe_left(self):
         v = pygame.math.Vector2(50, 0)
         v.rotate_ip(self.angle + 90)   # strafe left!!
@@ -502,20 +509,23 @@ class Spaceship(VectorSprite):
         v.rotate_ip(self.angle)
         self.move += v
         for p in [(-30,8), (-30,-8)]:
-               w=pygame.math.Vector2(p[0],p[1])
-               w.rotate_ip(self.angle)
-               Explosion(self.pos+w,
-                          minsparks = 0,
-                          maxsparks = 1,
-                          minangle = self.angle+180-5, 
-                          maxangle = self.angle+180+5, 
-                          maxlifetime = 0.3,
-                          minspeed = 100,
-                          maxspeed = 200,
-                          blue=0, blue_delta=0,
-                          green = 214, green_delta=20,
-                          red = 255, red_delta = 20
-                          )
+        #       w=pygame.math.Vector2(p[0],p[1])
+        #       w.rotate_ip(self.angle)
+        #       Explosion(self.pos+w,
+        #                  minsparks = 0,
+        #                  maxsparks = 1,
+        #                  minangle = self.angle+180-5, 
+        #                  maxangle = self.angle+180+5, 
+        #                  maxlifetime = 0.3,
+        #                  minspeed = 100,
+        #                  maxspeed = 200,
+        #                  blue=0, blue_delta=0,
+        #                  green = 214, green_delta=20,
+        #                  red = 255, red_delta = 20
+        #                  )
+            p = pygame.math.Vector2(32,0)
+            p.rotate_ip(self.angle+180)
+            Engine_glow(pos=pygame.math.Vector2(self.pos.x, self.pos.y) + p, max_age=0.1, angle = self.angle)
     def move_backward(self, speed=1):
         v = pygame.math.Vector2(speed,0)
         v.rotate_ip(self.angle)
@@ -636,7 +646,23 @@ class Rocket(VectorSprite):
         #self.image.convert_alpha()
         #self.image0 = self.image.copy()
         #self.rect = self.image.get_rect()
+
+
+class Muzzle_flash(VectorSprite):
     
+    def create_image(self):
+        self.image = PygView.images["muzzle_flash"]
+        self.image.convert_alpha()
+        self.image0 = self.image.copy()
+        self.rect = self.image.get_rect()
+        
+class Engine_glow(VectorSprite):
+    
+    def create_image(self):
+        self.image = PygView.images["engine_glow"]
+        self.image.convert_alpha()
+        self.image0 = self.image.copy()
+        self.rect = self.image.get_rect()
     
 
 
@@ -704,11 +730,21 @@ class PygView(object):
                  os.path.join("data", "bullet.png"))
             PygView.images["muzzle_flash"]=pygame.image.load(
                  os.path.join("data", "muzzle_flash.png"))
+            PygView.images["engine_glow"]=pygame.image.load(
+                 os.path.join("data", "engine_glow.png"))
             # --- scalieren ---
             for name in PygView.images:
                 if "player" in name:
                      img = PygView.images[name]
                      img = pygame.transform.scale(img, (50,50))
+                     PygView.images[name] = img
+                if "muzzle_flash" in name:
+                     img = PygView.images[name]
+                     img = pygame.transform.scale(img, (50,30))
+                     PygView.images[name] = img
+                if "engine_glow" in name:
+                     img = PygView.images[name]
+                     img = pygame.transform.scale(img, (50,30))
                      PygView.images[name] = img
                 
         except:
@@ -733,6 +769,8 @@ class PygView(object):
         Ufo.groups = self.allgroup
         Flytext.groups = self.allgroup
         Explosion.groups= self.allgroup, self.explosiongroup
+        Muzzle_flash.groups= self.allgroup
+        Engine_glow.groups= self.allgroup
         
         
 
