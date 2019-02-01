@@ -49,6 +49,11 @@ def elastic_collision(sprite1, sprite2):
            by Leonard Michlmayr"""
         if sprite1.static and sprite2.static:
             return 
+            
+        print("sprite1 , sprite2 ", sprite1, sprite2)
+        print("pos: sprite1 ", sprite1.pos)
+        print("pos: sprite2 ", sprite2.pos)
+        
         dirx = sprite1.pos.x - sprite2.pos.x
         diry = sprite1.pos.y - sprite2.pos.y
         sumofmasses = sprite1.mass + sprite2.mass
@@ -372,13 +377,15 @@ class VectorSprite(pygame.sprite.Sprite):
         # -- gravity ---
         # only one object can be the gravity source
         if self.gravity is not None:
-            # vector between self and gravity
-            v = self.gravity.pos - self.pos
-            l = v.length()
-            v.normalize_ip() # has now lenght of 1
-            #print("vector", v)
-            v *= 1000/l
-            self.move += v 
+            
+            for p in self.gravity:
+                # vector between self and gravity
+                v = p.pos - self.pos
+                l = v.length()
+                v.normalize_ip() # has now lenght of 1
+                #print("vector", v)
+                v *= 1000/l
+                self.move += v 
         self.distance_traveled += self.move.length() * seconds
         self.age += seconds
         self.wallbounce()
@@ -440,7 +447,17 @@ class Ufo(VectorSprite):
         self.image0 = self.image.copy()
         self.rect = self.image.get_rect()
         
-
+        
+class Powerup(VectorSprite):
+    
+        def create_image(self):
+            
+               
+            self.image = PygView.images["powerup1"]
+            self.image.set_colorkey((0,0,0))
+            self.image.convert_alpha()
+            self.image0 = self.image.copy()
+            self.rect = self.image.get_rect()
     
 
 class Spaceship(VectorSprite):
@@ -449,13 +466,15 @@ class Spaceship(VectorSprite):
         self.friction = 0.980  #1.0 = no friction
         self.radius = 8
         self.mass = 3000
+        self.reloadtime = 0
     
     def fire(self):
+        PygView.laser1.play()
         v = pygame.math.Vector2(188,0)
         v.rotate_ip(self.angle)
         Rocket(pos=pygame.math.Vector2(self.pos.x,
                                self.pos.y), angle=self.angle,
-                               move=v+self.move, max_age=10,
+                               move=v+self.move, max_age=1000,
                                kill_on_edge=True, color=self.color,
                                bossnumber=self.number)
         # --- mzzleflash 25, 0  vor raumschiff
@@ -468,6 +487,8 @@ class Spaceship(VectorSprite):
     
     def update(self, seconds):
         VectorSprite.update(self, seconds)
+        if self.reloadtime > 0:
+            self.reloadtime -= seconds
         #if random.random() < 0.8:
         #    for x,y  in [(-30,-8), (-30,8)]:
         #         v = pygame.math.Vector2(x,y)
@@ -481,11 +502,11 @@ class Spaceship(VectorSprite):
         v.rotate_ip(self.angle + 90)   # strafe left!!
         self.move += v
         Explosion(self.pos, 
-                  minangle = self.angle - 90 -35,
-                  maxangle = self.angle - 90 +35,
+                  minangle = int(self.angle) - 90 -35,
+                  maxangle = int(self.angle) - 90 +35,
                   maxlifetime = 0.75,
-                  minsparks = 100,
-                  maxsparks = 150,
+                  minsparks = 50,
+                  maxsparks = 70,
                   minspeed = 50,
                   red = 0, red_delta=0,
                   green= 0, green_delta=0,
@@ -500,11 +521,11 @@ class Spaceship(VectorSprite):
         v.rotate_ip(self.angle - 90)   # strafe right!!
         self.move += v
         Explosion(self.pos, 
-                  minangle = self.angle + 90 -35,
-                  maxangle = self.angle + 90 +35,
+                  minangle = int(self.angle) + 90 -35,
+                  maxangle = int(self.angle) + 90 +35,
                   maxlifetime = 0.75,
-                  minsparks = 100,
-                  maxsparks = 150,
+                  minsparks = 50,
+                  maxsparks = 70,
                   minspeed = 50,
                   red = 0, red_delta=0,
                   green= 0, green_delta=0,
@@ -678,8 +699,17 @@ class Engine_glow(VectorSprite):
     
 class Planet(VectorSprite):
     
+    def _overwrite_parameters(self):
+        VectorSprite._overwrite_parameters(self)
+        self.static = True
+        self.mass = 600000
+        #self.set_angle(random.randint(0,360))
+    
     def create_image(self):
-        self.image = PygView.images["planet"]
+        if self.number == 2:
+            self.image = PygView.images["planet1"]
+        else:
+            self.image = PygView.images["planet2"]
         self.image.convert_alpha()
         self.image0 = self.image.copy()
         self.rect = self.image.get_rect()
@@ -693,6 +723,7 @@ class PygView(object):
     def __init__(self, width=640, height=400, fps=30):
         """Initialize pygame, window, background, font,...
            default arguments """
+        pygame.mixer.pre_init(44100, -16, 1, 512)
         pygame.init()
         PygView.width = width    # make global readable
         PygView.height = height
@@ -721,9 +752,10 @@ class PygView(object):
         pygame.joystick.init()
         self.joysticks = [pygame.joystick.Joystick(x) for x in range(pygame.joystick.get_count())]
         for j in self.joysticks:
-            j.init()
+            j.init
         self.paint()
         self.loadbackground()
+        self.loadsounds()
 
     def loadbackground(self):
         
@@ -738,6 +770,20 @@ class PygView(object):
                           (PygView.width,PygView.height))
         self.background.convert()
         
+    def loadsounds(self):
+        # --sounds --
+        PygView.laser1 = pygame.mixer.Sound(os.path.join("data","laser1.wav"))
+        PygView.explosion1 = pygame.mixer.Sound(os.path.join("data","explosion1.wav"))
+        PygView.explosion1.set_volume(1.0)
+        PygView.laser1.set_volume(0.1)
+        
+        
+        
+        #-- music--
+        self.music1 = pygame.mixer.music.load(os.path.join( "data", "music1.ogg"))
+        pygame.mixer.music.set_volume(0.3)
+        #self.music2 = pygame.mixer.music.load(os.path.join( "data", "music2.ogg"))
+        #self.music3 = pygame.mixer.music.load(os.path.join( "data", "music3.ogg"))
     
     def load_sprites(self):
         #try:
@@ -751,8 +797,12 @@ class PygView(object):
              os.path.join("data", "muzzle_flash.png"))
         PygView.images["engine_glow"]=pygame.image.load(
              os.path.join("data", "engine_glow.png"))
-        PygView.images["planet"]=pygame.image.load(
+        PygView.images["planet1"]=pygame.image.load(
              os.path.join("data", "planet.png"))
+        PygView.images["planet2"]=pygame.image.load(
+             os.path.join("data", "planet2.png"))
+        PygView.images["powerup1"]=pygame.image.load(
+             os.path.join("data", "powerup1.png"))
         #except:
         #    print("problem loading player1.png or player2.png from folder data")
             
@@ -774,7 +824,10 @@ class PygView(object):
                  img = PygView.images[name]
                  img = pygame.transform.scale(img, (300,300))
                  PygView.images[name] = img
-            
+            if "powerup" in name:
+                 img = PygView.images[name]
+                 img = pygame.transform.scale(img, (50, 50))
+                 PygView.images[name] = img
       
      
     def paint(self):
@@ -790,6 +843,7 @@ class PygView(object):
         self.planetgroup = pygame.sprite.Group()
         self.gravitygroup = pygame.sprite.Group()
         self.sparkgroup = pygame.sprite.Group()
+        self.powerupgroup = pygame.sprite.Group()
 
         Mouse.groups = self.allgroup, self.mousegroup, self.tailgroup
         VectorSprite.groups = self.allgroup
@@ -802,20 +856,25 @@ class PygView(object):
         Engine_glow.groups= self.allgroup
         Planet.groups = self.allgroup, self.planetgroup, self.gravitygroup
         Spark.groups = self.allgroup, self.sparkgroup
+        Powerup.groups = self.allgroup, self.powerupgroup
         
 
         self.player1 =  Spaceship(imagename="player1", warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2-100,-PygView.height/2))
-        self.player2 =  Spaceship(imagename="player2", angle=180,warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2+100,-PygView.height/2))
-        self.planet = Planet(imagename="planet", pos= (300, -300))
-   
+        self.player2 =  Spaceship(imagename="player2", angle=180,warp_on_edge=True, pos=pygame.math.Vector2(PygView.width/2+450,-PygView.height/2-250))
+        self.planet = Planet(imagename="planet1", pos=pygame.math.Vector2(300, -300))
+        self.planet2 = Planet(imagename="planet2", pos=pygame.math.Vector2(900, -600))
+        #self.powerup1 = Powerup(imagename = "powerup1", warp_on_edge = True)
     def run(self):
         """The mainloop"""
         running = True
-        pygame.mouse.set_visible(False)
+        #pygame.mouse.set_visible(False)
         oldleft, oldmiddle, oldright  = False, False, False
         self.snipertarget = None
         gameOver = False
         exittime = 0
+        pygame.mixer.music.play(loops=1)   # -1 für endlos
+        pygame.mixer.music.queue(os.path.join("data", "music2.ogg"))
+        pygame.mixer.music.queue(os.path.join("data", "music3.ogg"))
         while running:
             pygame.display.set_caption("player1 hp: {} player2 hp: {}".format(
                                  self.player1.hitpoints, self.player2.hitpoints))
@@ -853,10 +912,16 @@ class PygView(object):
                     
                     # ------- fire player 1 -----
                     if event.key == pygame.K_TAB:
-                        self.player1.fire()
+                        if self.player1.reloadtime<= 0:
+                            self.player1.fire()
+                            self.player1.reloadtime+= 0.3
                     # ------- fire player 2 ------
                     if event.key == pygame.K_SPACE:
                         self.player2.fire()
+                       
+                    # -------- music--------
+                    if event.key == pygame.K_p:
+                        pygame.mixer.music.get_pos()
                         
                     
    
@@ -882,20 +947,38 @@ class PygView(object):
             if pressed_keys[pygame.K_s]:
                 self.player1.move_backward()
             # ------- movement keys for player 2 ---------
-            if pressed_keys[pygame.K_j]:
-                 self.player2.turn_left()
-            if pressed_keys[pygame.K_l]:
-                 self.player2.turn_right()
-            if pressed_keys[pygame.K_i]:
-                 self.player2.move_forward()
-            if pressed_keys[pygame.K_k]:
-                 self.player2.move_backward()  
+            #if pressed_keys[pygame.K_j]:
+            #     self.player2.turn_left()
+            #if pressed_keys[pygame.K_l]:
+            #     self.player2.turn_right()
+            #if pressed_keys[pygame.K_i]:
+            #     self.player2.move_forward()
+            #if pressed_keys[pygame.K_k]:
+            #     self.player2.move_backward()  
+            vm = pygame.math.Vector2(pygame.mouse.get_pos()[0], 
+                                     -pygame.mouse.get_pos()[1])
+            v1 = pygame.math.Vector2(100,0)
+            diff = vm - self.player2.pos 
+            angle = diff.angle_to(v1)
+            self.player2.set_angle(-angle)
+            print(vm, v1,  self.player2.pos, self.player2.angle)
+            #pygame.draw.line(self.screen,(200, 0, 0),(0,0), pygame.mouse.get_pos())
+            #pygame.draw.line(self.screen,(200, 0, 0),(0,0), (self.player2.pos.x,-self.player2.pos.y))
+            
+            
             
             # ------ mouse handler ------
             left,middle,right = pygame.mouse.get_pressed()
             oldleft, oldmiddle, oldright = left, middle, right
-
-           
+            
+            if middle:
+                if self.player2.reloadtime <= 0:
+                    self.player2.fire()
+                    self.player2.reloadtime = 0.5
+            if left:
+                self.player2.move_forward()
+            if right:
+                self.player2.strafe_right()
             # ------ joystick handler -------
             for number, j in enumerate(self.joysticks):
                 if number == 0:
@@ -931,6 +1014,14 @@ class PygView(object):
             # write text below sprites
             write(self.screen, "FPS: {:8.3}".format(
                 self.clock.get_fps() ), x=10, y=10)
+                
+            # ------ chance for random powerup ------
+            if random.random() < 0.0008:
+                m=pygame.math.Vector2(100,0)
+                m.rotate_ip(random.randint(0,360))
+                Powerup(bounce_on_edge = True, move=m)
+                
+                
             
             # ----- collision detection between player and rocket -----
             for p in self.playergroup:
@@ -938,10 +1029,23 @@ class PygView(object):
                              False, pygame.sprite.collide_mask)
                 for r in crashgroup:
                     if r.bossnumber != p.number:
+                        PygView.explosion1.play()
                         p.hitpoints -= random.randint(4,9)
                         Explosion(pygame.math.Vector2(r.pos.x, r.pos.y))
                         elastic_collision(p, r)
                         r.kill()
+            # ----- collision detection between player and powerup----
+            for p in self.playergroup:
+                crashgroup = pygame.sprite.spritecollide(p, self.powerupgroup,
+                             False, pygame.sprite.collide_mask)
+                for u in crashgroup:
+                    #if u.bossnumber != p.number:
+                        Flytext(u.pos.x, -u.pos.y, ("+100 Hitpoints!"))
+                        #p.hitpoints -= random.randint(4,9)
+                        p.hitpoints+=100
+                        Explosion(pygame.math.Vector2(u.pos.x, u.pos.y))
+                        #elastic_collision(p, u)
+                        u.kill()
             
             # -------------- collision detection between player and player------ #
             for p in self.playergroup:
@@ -962,10 +1066,9 @@ class PygView(object):
                 for r in crashgroup:
                 #    if p.number != p2.number:
                 #        #p.hitpoints -= random.randint(4,9)
-                        Explosion(pygame.math.Vector2(r.pos.x, r.pos.y), gravity = self.planet)
+                        Explosion(pygame.math.Vector2(r.pos.x, r.pos.y), gravity = [self.planet, self.planet2])
                         #elastic_collision(p, r)
                         r.kill()
-              
             # -------------- collision detection between planet and spark------ #
             for p in self.planetgroup:
                 crashgroup = pygame.sprite.spritecollide(p, self.sparkgroup,
@@ -976,9 +1079,18 @@ class PygView(object):
                         #Explosion(pygame.math.Vector2(r.pos.x, r.pos.y), gravity = self.planet)
                         #elastic_collision(p, r)
                         s.kill()
+            #-------------- collision detection betwen player and planet -----#
+            for p in self.planetgroup:
+                crashgroup = pygame.sprite.spritecollide(p, self.playergroup,
+                             False, pygame.sprite.collide_mask)
+                for p2 in crashgroup:
+                    elastic_collision(p, p2)
+            
+            
             
             for r in self.rocketgroup:
-                r.gravity=self.planet
+                r.gravity=[self.planet, self.planet2]
+            
             
             # -------------- UPDATE all sprites -------             
             self.allgroup.update(seconds)
