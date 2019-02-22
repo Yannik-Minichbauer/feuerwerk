@@ -452,8 +452,8 @@ class Powerup(VectorSprite):
     
         def create_image(self):
             
-               
-            self.image = Viewer.images["powerup1"]
+            self.imagename = random.choice(("powerup1", "powerup2", "powerup3"))   
+            self.image = Viewer.images[self.imagename]
             self.image.set_colorkey((0,0,0))
             self.image.convert_alpha()
             self.image0 = self.image.copy()
@@ -467,16 +467,23 @@ class Spaceship(VectorSprite):
         self.radius = 8
         self.mass = 3000
         self.reloadtime = 0
+        self.damage = 7
+        self.speed = 1
     
+    def kill(self):
+        Explosion(posvector=self.pos, maxlifetime=5, minsparks=250, maxsparks=400)
+        VectorSprite.kill(self)
+        
     def fire(self):
         Viewer.laser1.play()
         v = pygame.math.Vector2(188,0)
         v.rotate_ip(self.angle)
+        d = self.damage + random.randint(-2,2)
         Rocket(pos=pygame.math.Vector2(self.pos.x,
                                self.pos.y), angle=self.angle,
                                move=v+self.move, max_age=1000,
                                kill_on_edge=True, color=self.color,
-                               bossnumber=self.number)
+                               bossnumber=self.number, damage=d)
         # --- mzzleflash 25, 0  vor raumschiff
         p = pygame.math.Vector2(32,0)
         p.rotate_ip(self.angle)
@@ -537,7 +544,7 @@ class Spaceship(VectorSprite):
         
     
     def move_forward(self, speed=1):
-        v = pygame.math.Vector2(speed,0)
+        v = pygame.math.Vector2(self.speed,0)
         v.rotate_ip(self.angle)
         self.move += v
         for p in [(-30,8), (-30,-8)]:
@@ -671,7 +678,10 @@ class Rocket(VectorSprite):
          #         max_age=2.5)
 
     def create_image(self):
-        self.image = Viewer.images["bullet"]
+        if self.bossnumber == 0:
+            self.image = Viewer.images["bullet"]
+        elif self.bossnumber == 1:
+            self.image = Viewer.images["bullet2"]
         self.image.convert_alpha()
         self.image0 = self.image.copy()
         self.rect = self.image.get_rect()
@@ -723,7 +733,7 @@ class Viewer(object):
     height = 0
     images = {}
 
-    def __init__(self, width=640, height=400, fps=30):
+    def __init__(self, width=640, height=400, fps=60):
         """Initialize pygame, window, background, font,...
            default arguments """
         pygame.mixer.pre_init(44100, -16, 1, 512)
@@ -762,9 +772,10 @@ class Viewer(object):
 
     def loadbackground(self):
         
+        # ----- normaler background ----
         try:
             self.background = pygame.image.load(os.path.join("data",
-                 random.choice(self.backgroundfilenames)))
+                 "background.jpg"))
         except:
             self.background = pygame.Surface(self.screen.get_size()).convert()
             self.background.fill((255,255,255)) # fill background white
@@ -772,6 +783,16 @@ class Viewer(object):
         self.background = pygame.transform.scale(self.background,
                           (Viewer.width,Viewer.height))
         self.background.convert()
+        # ------ menubackground ------
+        try:
+            self.menubackground = pygame.image.load(os.path.join("data",
+                    "menubackground.jpg"))
+        except:
+             self.menubackground = pygame.Surface(self.screen.get_size()).convert()
+             self.menubackground.fill((200,200,200)) # fill background grey
+        self.menubackground = pygame.transform.scale(self.menubackground,
+                          (Viewer.width,Viewer.height))
+        self.menubackground.convert()
         
     def loadsounds(self):
         # --sounds --
@@ -796,6 +817,8 @@ class Viewer(object):
              os.path.join("data", "player2.png"))
         Viewer.images["bullet"]= pygame.image.load(
              os.path.join("data", "bullet.png"))
+        Viewer.images["bullet2"]= pygame.image.load(
+             os.path.join("data", "bullet2.png"))
         Viewer.images["muzzle_flash"]=pygame.image.load(
              os.path.join("data", "muzzle_flash.png"))
         Viewer.images["engine_glow"]=pygame.image.load(
@@ -806,8 +829,12 @@ class Viewer(object):
              os.path.join("data", "planet2.png"))
         Viewer.images["powerup1"]=pygame.image.load(
              os.path.join("data", "powerup1.png"))
+        Viewer.images["powerup2"]=pygame.image.load(
+             os.path.join("data", "powerup2.png"))
+        Viewer.images["powerup3"]=pygame.image.load(
+             os.path.join("data", "powerup3.png"))
         Viewer.images["menuborder"]=pygame.image.load(
-             os.path.join("data", "menuborder.png"))
+             os.path.join("data", "menuborder2.png"))
         #except:
         #    print("problem loading player1.png or player2.png from folder data")
             
@@ -835,7 +862,7 @@ class Viewer(object):
                  Viewer.images[name] = img
             if "border" in name:
                  img = Viewer.images[name]
-                 img = pygame.transform.scale(img, (200, 66))
+                 img = pygame.transform.scale(img, (225, 66))
                  Viewer.images[name] = img
       
      
@@ -881,8 +908,8 @@ class Viewer(object):
         #pygame.mouse.set_visible(False)
         oldleft, oldmiddle, oldright  = False, False, False
         self.cursorpos = 0
-        self.topmenu=["Start Game", " Settings ", " Powerups ", " Credits  "]
-        self.settingmenu = [" Gravity  "," Powerups ","  Sound   ","   Back   "]
+        self.topmenu=[" Start Game", "  Settings ", "  Powerups ", "  Credits  "]
+        self.settingmenu = ["  Gravity ","  Powerups","   Sound ","    Back   "]
         self.powermenu = []
         self.menuitems = self.topmenu[:] # copy
         while running:
@@ -910,18 +937,21 @@ class Viewer(object):
                             self.cursorpos=0
                     if event.key == pygame.K_RETURN:
                         action = self.menuitems[self.cursorpos]
-                        if action == "Start Game":
+                        if action == " Start Game":
                             return
-                        elif action == " Settings ": 
+                            
+                        elif action == "  Settings ": 
                             self.menuitems = self.settingmenu[:]
                     
-   
-            # ---------delete everything on screen
-            self.screen.blit(self.background, (0, 0))
             
-            write(self.screen, "menu", 700, 100, color=(200,200,200))
+            
+         
+            # ---------delete everything on screen
+            self.screen.blit(self.menubackground, (0, 0))
+            
+            write(self.screen, "Menu", 700, 100, color=(255,246,0))
             for x, i in enumerate(self.menuitems):
-                write(self.screen, i, 400 + x*200, 200, color=(200,200,200))
+                write(self.screen, i, 400 + x*200, 200, color=(255,246,0))
             #write(self.screen, "Start Game", 400, 200, color=(200,200,200))
             #write(self.screen, " Settings ", 600, 200, color=(200,200,200))
             #write(self.screen, " Powerups ", 800, 200, color=(200,200,200))
@@ -934,9 +964,11 @@ class Viewer(object):
             #    self.cursorpos = 3
             #elif x > 500 and x < 700:
             #    self.cursorpos = 1
-                
+            
+            # ---- draw ellipse around menuitem ----
+            self.screen.blit(Viewer.images["menuborder"], (370 + self.cursorpos * 200, 183))    
                   
-            pygame.draw.ellipse(self.screen, (0,255,0), (370 + self.cursorpos * 200, 183, 200, 50), 1) 
+            #pygame.draw.ellipse(self.screen, (0,255,0), (370 + self.cursorpos * 200, 183, 200, 50), 1) 
             # ------ mouse handler ------
             left,middle,right = pygame.mouse.get_pressed()
             oldleft, oldmiddle, oldright = left, middle, right
@@ -1039,10 +1071,10 @@ class Viewer(object):
             self.screen.blit(self.background, (0, 0))
             
             # ------ move indicator for player 1 -----
-            pygame.draw.circle(self.screen, (0,255,0), (100,100), 100,1)
-            glitter = (0, random.randint(128, 255), 0)
-            pygame.draw.line(self.screen, glitter, (100,100), 
-                            (100 + self.player1.move.x, 100 - self.player1.move.y))
+            #pygame.draw.circle(self.screen, (0,255,0), (100,100), 100,1)
+            #glitter = (0, random.randint(128, 255), 0)
+            #pygame.draw.line(self.screen, glitter, (100,100), 
+            #                (100 + self.player1.move.x, 100 - self.player1.move.y))
              
 
             # ------------ pressed keys ------
@@ -1140,7 +1172,7 @@ class Viewer(object):
                 for r in crashgroup:
                     if r.bossnumber != p.number:
                         Viewer.explosion1.play()
-                        p.hitpoints -= random.randint(4,9)
+                        p.hitpoints -= r.damage
                         Explosion(pygame.math.Vector2(r.pos.x, r.pos.y))
                         elastic_collision(p, r)
                         r.kill()
@@ -1149,13 +1181,32 @@ class Viewer(object):
                 crashgroup = pygame.sprite.spritecollide(p, self.powerupgroup,
                              False, pygame.sprite.collide_mask)
                 for u in crashgroup:
-                    #if u.bossnumber != p.number:
+                    r = 0
+                    g = 0
+                    b = 0
+                    rd = 25
+                    gd = 25
+                    bd = 25
+                    # ----- was für ein powerup? -----
+                    name = u.imagename
+                    if name == "powerup1":
+                        # ======== more hitpoints 
                         Flytext(u.pos.x, -u.pos.y, ("+100 Hitpoints!"))
                         #p.hitpoints -= random.randint(4,9)
                         p.hitpoints+=100
-                        Explosion(pygame.math.Vector2(u.pos.x, u.pos.y))
+                        r = 255
+                        g = 100
+                    elif name == "powerup2":
+                        r = 200
+                        p.damage *= 2
+                        Flytext(u.pos.x, -u.pos.y, ("Double damage!"))
+                    elif name == "powerup3":
+                        g = 200
+                        p.speed += 1
+                        Flytext(u.pos.x, -u.pos.y, ("Moving faster now!"))
+                    Explosion(pygame.math.Vector2(u.pos.x, u.pos.y), red=r, green=g, blue=b, red_delta=rd, green_delta = gd, blue_delta = bd)
                         #elastic_collision(p, u)
-                        u.kill()
+                    u.kill()
             
             # -------------- collision detection between player and player------ #
             for p in self.playergroup:
