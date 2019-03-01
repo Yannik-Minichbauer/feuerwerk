@@ -376,7 +376,7 @@ class VectorSprite(pygame.sprite.Sprite):
         self.move *= self.friction 
         # -- gravity ---
         # only one object can be the gravity source
-        if self.gravity is not None:
+        if self.gravity:   # is not None:
             
             for p in self.gravity:
                 # vector between self and gravity
@@ -452,13 +452,14 @@ class Powerup(VectorSprite):
     
         def create_image(self):
             
-            self.imagename = random.choice(("powerup1", "powerup2", "powerup3"))   
-            self.image = Viewer.images[self.imagename]
-            self.image.set_colorkey((0,0,0))
-            self.image.convert_alpha()
-            self.image0 = self.image.copy()
-            self.rect = self.image.get_rect()
-    
+            if Viewer.powerups:
+                self.imagename = random.choice(("powerup1", "powerup2", "powerup3"))   
+                self.image = Viewer.images[self.imagename]
+                self.image.set_colorkey((0,0,0))
+                self.image.convert_alpha()
+                self.image0 = self.image.copy()
+                self.rect = self.image.get_rect()
+        
 
 class Spaceship(VectorSprite):
     
@@ -475,7 +476,8 @@ class Spaceship(VectorSprite):
         VectorSprite.kill(self)
         
     def fire(self):
-        Viewer.laser1.play()
+        if Viewer.sound:
+            Viewer.laser1.play()
         v = pygame.math.Vector2(188,0)
         v.rotate_ip(self.angle)
         d = self.damage + random.randint(-2,2)
@@ -483,7 +485,7 @@ class Spaceship(VectorSprite):
                                self.pos.y), angle=self.angle,
                                move=v+self.move, max_age=1000,
                                kill_on_edge=True, color=self.color,
-                               bossnumber=self.number, damage=d)
+                               bossnumber=self.number, damage=d, gravity = Viewer.gravity)
         # --- mzzleflash 25, 0  vor raumschiff
         p = pygame.math.Vector2(32,0)
         p.rotate_ip(self.angle)
@@ -746,6 +748,9 @@ class Viewer(object):
         self.clock = pygame.time.Clock()
         self.fps = fps
         self.playtime = 0.0
+        Viewer.sound=True
+        Viewer.gravity = False
+        Viewer.powerups = True
         # ------ background images ------
         self.backgroundfilenames = [] # every .jpg file in folder 'data'
         try:
@@ -834,7 +839,7 @@ class Viewer(object):
         Viewer.images["powerup3"]=pygame.image.load(
              os.path.join("data", "powerup3.png"))
         Viewer.images["menuborder"]=pygame.image.load(
-             os.path.join("data", "menuborder2.png"))
+             os.path.join("data", "menuborder.png"))
         #except:
         #    print("problem loading player1.png or player2.png from folder data")
             
@@ -908,9 +913,8 @@ class Viewer(object):
         #pygame.mouse.set_visible(False)
         oldleft, oldmiddle, oldright  = False, False, False
         self.cursorpos = 0
-        self.topmenu=[" Start Game", "  Settings ", "  Powerups ", "  Credits  "]
-        self.settingmenu = ["  Gravity ","  Powerups","   Sound ","    Back   "]
-        self.powermenu = []
+        self.topmenu=["Start Game", " Settings ", "  Credits "]
+        self.settingmenu = ["  Gravity "," Powerups ","   Sound  ","   Back   "]
         self.menuitems = self.topmenu[:] # copy
         while running:
             pygame.display.set_caption("player1 hp: {} player2 hp: {}".format(
@@ -929,19 +933,29 @@ class Viewer(object):
                         running = False
                     if event.key == pygame.K_RIGHT:
                         self.cursorpos += 1
-                        if self.cursorpos>3:
-                            self.cursorpos=3
+                        if self.cursorpos>len(self.menuitems)-1:
+                            self.cursorpos=len(self.menuitems)-1
                     if event.key == pygame.K_LEFT:
                         self.cursorpos -= 1
-                        if self.cursorpos<0:
+                        if self.cursorpos<0: 
                             self.cursorpos=0
                     if event.key == pygame.K_RETURN:
                         action = self.menuitems[self.cursorpos]
-                        if action == " Start Game":
+                        if action == "Start Game":
                             return
                             
-                        elif action == "  Settings ": 
+                        elif action == " Settings ": 
                             self.menuitems = self.settingmenu[:]
+                        elif action == "   Back   ":
+                            self.menuitems= self.topmenu[:]
+                            self.cursorpos = 0
+                        elif action == "   Sound  ":
+                            Viewer.sound= not Viewer.sound
+                        elif action == "  Gravity ":
+                            Viewer.gravity= not Viewer.gravity
+                        elif action == " Powerups ":
+                            Viewer.powerups= not Viewer.powerups
+                            
                     
             
             
@@ -949,9 +963,9 @@ class Viewer(object):
             # ---------delete everything on screen
             self.screen.blit(self.menubackground, (0, 0))
             
-            write(self.screen, "Menu", 700, 100, color=(255,246,0))
+            write(self.screen, "Menu", 730, 100, color=(255,246,0))
             for x, i in enumerate(self.menuitems):
-                write(self.screen, i, 400 + x*200, 200, color=(255,246,0))
+                write(self.screen, i, 500 + x*200, 200, color=(255,246,0))
             #write(self.screen, "Start Game", 400, 200, color=(200,200,200))
             #write(self.screen, " Settings ", 600, 200, color=(200,200,200))
             #write(self.screen, " Powerups ", 800, 200, color=(200,200,200))
@@ -966,8 +980,29 @@ class Viewer(object):
             #    self.cursorpos = 1
             
             # ---- draw ellipse around menuitem ----
-            self.screen.blit(Viewer.images["menuborder"], (370 + self.cursorpos * 200, 183))    
+            self.screen.blit(Viewer.images["menuborder"], (460 + self.cursorpos * 200, 183))    
                   
+                  
+            # ---- draw statuszeile -----
+            if self.menuitems == self.settingmenu[:]:
+                # sound
+                if self.sound:
+                    status = "on"
+                else:
+                    status = "off"
+                write(self.screen, "Sound is {}".format(status), 68, 120, (115,211,49), fontsize =18)
+                # gravity
+                if Viewer.gravity:
+                    status = "on"
+                else:
+                    status = "off"
+                write(self.screen, "Gravity is {}".format(status), 68, 80, (115,211,49), fontsize=18)
+                if Viewer.powerups:
+                    status = "on"
+                else:
+                    status = "off"
+                write(self.screen, "Powerups are {}".format(status), 68, 100, (115,211,49), fontsize=18)
+                                  
             #pygame.draw.ellipse(self.screen, (0,255,0), (370 + self.cursorpos * 200, 183, 200, 50), 1) 
             # ------ mouse handler ------
             left,middle,right = pygame.mouse.get_pressed()
@@ -1012,9 +1047,10 @@ class Viewer(object):
         self.snipertarget = None
         gameOver = False
         exittime = 0
-        pygame.mixer.music.play(loops=1)   # -1 für endlos
-        pygame.mixer.music.queue(os.path.join("data", "music2.ogg"))
-        pygame.mixer.music.queue(os.path.join("data", "music3.ogg"))
+        if self.sound:
+            pygame.mixer.music.play(loops=1)   # -1 für endlos
+            pygame.mixer.music.queue(os.path.join("data", "music2.ogg"))
+            pygame.mixer.music.queue(os.path.join("data", "music3.ogg"))
         while running:
             pygame.display.set_caption("player1 hp: {} player2 hp: {}".format(
                                  self.player1.hitpoints, self.player2.hitpoints))
@@ -1171,7 +1207,8 @@ class Viewer(object):
                              False, pygame.sprite.collide_mask)
                 for r in crashgroup:
                     if r.bossnumber != p.number:
-                        Viewer.explosion1.play()
+                        if self.sound:
+                            Viewer.explosion1.play()
                         p.hitpoints -= r.damage
                         Explosion(pygame.math.Vector2(r.pos.x, r.pos.y))
                         elastic_collision(p, r)
